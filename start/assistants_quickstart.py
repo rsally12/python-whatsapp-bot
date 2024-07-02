@@ -19,7 +19,7 @@ def upload_file(path):
 
 
 file = upload_file("../data/airbnb-faq.pdf")
-
+file.id = "file-quoF5IqTBbKPIowUqssb5OVF"
 
 # --------------------------------------------------------------
 # Create assistant
@@ -31,9 +31,14 @@ def create_assistant(file):
     assistant = client.beta.assistants.create(
         name="WhatsApp AirBnb Assistant",
         instructions="You're a helpful WhatsApp assistant that can assist guests that are staying in our Paris AirBnb. Use your knowledge base to best respond to customer queries. If you don't know the answer, say simply that you cannot help with question and advice to contact the host directly. Be friendly and funny.",
-        tools=[{"type": "retrieval"}],
-        model="gpt-4-1106-preview",
-        file_ids=[file.id],
+        tools=[{"type": "code_interpreter"}],
+        model="gpt-3.5-turbo",
+        tool_resources ={
+            "code_interpreter": {
+                "file_ids": [file.id]
+            }
+        }
+        # file_ids=[file.id],
     )
     return assistant
 
@@ -67,11 +72,13 @@ def generate_response(message_body, wa_id, name):
         thread = client.beta.threads.create()
         store_thread(wa_id, thread.id)
         thread_id = thread.id
+        print(thread_id)
 
     # Otherwise, retrieve the existing thread
     else:
         print(f"Retrieving existing thread for {name} with wa_id {wa_id}")
         thread = client.beta.threads.retrieve(thread_id)
+        print(thread)
 
     # Add message to thread
     message = client.beta.threads.messages.create(
@@ -91,7 +98,7 @@ def generate_response(message_body, wa_id, name):
 # --------------------------------------------------------------
 def run_assistant(thread):
     # Retrieve the Assistant
-    assistant = client.beta.assistants.retrieve("asst_7Wx2nQwoPWSf710jrdWTDlfE")
+    assistant = client.beta.assistants.retrieve("asst_wkZEv6oM8EgdPSo5Ra0JBfzz")
 
     # Run the assistant
     run = client.beta.threads.runs.create(
