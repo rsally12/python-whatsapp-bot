@@ -2,11 +2,18 @@ import logging
 from flask import current_app, jsonify, request
 import json
 import requests
-from app.services.openai_service import generate_response
 import re
 
 # Temporary storage for user interactions
 user_interactions = {}
+
+# Dietary options for the first question
+first_question_options = ["Animal Meats",
+                          "Added Sugars", "Sodium/Salt", "Saturated Fat"]
+# Dietary options for the second question
+second_question_options = ["Whole Grains",
+                           "Plant Proteins", "Vegetables", "Fruit", "Fish"]
+
 
 def log_http_response(response):
     logging.info(f"Status: {response.status_code}")
@@ -15,7 +22,6 @@ def log_http_response(response):
 
 
 def get_text_message_input(recipient, text):
-    #print(recipient, text)
     return json.dumps(
         {
             "messaging_product": "whatsapp",
@@ -27,52 +33,30 @@ def get_text_message_input(recipient, text):
     )
 
 
-def generate_response(response):
-    # Return text in uppercase
-    print("Hi")
-    return response.upper()
-
-
 def send_message(data):
-    #print(data)
-    #print(type(data))
     headers = {
         "Content-type": "application/json",
         "Authorization": f"Bearer {current_app.config['ACCESS_TOKEN']}",
     }
-    #print(headers)
     url = f"https://graph.facebook.com/{current_app.config['VERSION']}/{current_app.config['PHONE_NUMBER_ID']}/messages"
 
     try:
         response = requests.post(
             url, data=data, headers=headers, timeout=10
-        )  # 10 seconds timeout as an example
-        response.raise_for_status()  # Raises an HTTPError if the HTTP request returned an unsuccessful status code
+        )
+        response.raise_for_status()
     except requests.Timeout:
         logging.error("Timeout occurred while sending message")
         return jsonify({"status": "error", "message": "Request timed out"}), 408
-    except (
-        requests.RequestException
-    ) as e:  # This will catch any general request exception
-        #print("heeeeyyyyyyyyyyyy")
+    except requests.RequestException as e:
         logging.error(f"Request failed due to: {e}")
         return jsonify({"status": "error", "message": "Failed to send message"}), 500
     else:
-        # Process the response as normal
         log_http_response(response)
         return response
 
-# Send Welcome Message
-'''
-def send_welcome_message(recipient):
-    welcome_text = "Welcome to our service! How can we assist you today?"
-    data = get_text_message_input(recipient, welcome_text)
-    send_message(data)
-'''    
-        
-#Send interactive example
-'''   
-def send_interactive_message_with_buttons(recipient):
+
+def send_interactive_message_with_buttons(recipient, buttons, text):
     url = f"https://graph.facebook.com/{current_app.config['VERSION']}/{current_app.config['PHONE_NUMBER_ID']}/messages"
     headers = {
         "Authorization": "Bearer " + current_app.config['ACCESS_TOKEN'],
@@ -85,326 +69,240 @@ def send_interactive_message_with_buttons(recipient):
         "interactive": {
             "type": "button",
             "body": {
-                "text": "Do you want to proceed?"
+                "text": text
             },
             "action": {
-                "buttons": [
-                    {
-                        "type": "reply",
-                        "reply": {
-                            "id": "yes_button",
-                            "title": "Yes"
-                        }
-                    },
-                    {
-                        "type": "reply",
-                        "reply": {
-                            "id": "idk_button",
-                            "title": "IDK"
-                        }
-                    },
-                    {
-                        "type": "reply",
-                        "reply": {
-                            "id": "no_button",
-                            "title": "No"
-                        }
-                    }
-                ]
+                "buttons": buttons
             }
         }
     }
-
-    response = requests.post(url, headers=headers, json=payload)
-    print(response.status_code)
-    print(response.json())
+    try:
+        response = requests.post(url, headers=headers, json=payload)
+        response.raise_for_status()
+        logging.info(f"Interactive message sent to {recipient}")
+        logging.info(response.json())
+    except requests.RequestException as e:
+        logging.error(f"Failed to send interactive message: {e}")
     return response
-'''
-'''
-# Checkbox buttons
-def send_checkbox_buttons(recipient):
-    url = f"https://graph.facebook.com/{current_app.config['VERSION']}/{current_app.config['PHONE_NUMBER_ID']}/messages"
-    headers = {
-        "Authorization": "Bearer " + current_app.config['ACCESS_TOKEN'],
-        "Content-Type": "application/json",
-    }
-    payload = {
-        "messaging_product": "whatsapp",
-        "to": recipient,
-        "type": "interactive",
-        "interactive": {
-            "type": "list",
-            "header": {
-                "type": "text",
-                "text": "Choose all that apply:"
-            },
-            "body": {
-                "text": "We will ask you some questions on your dietary goals.  Which of these would you like to get less of?"
-            },
-            "footer": {
-                "text": "Select options"
-            },
-            "action": {
-                "button": "Options",
-                "sections": [
-                    {
-                        "title": "Options",
-                        "rows": [
-                            {"id": "buy_it", "title": "Buy it right away"},
-                            {"id": "check_reviews", "title": "Check reviews"},
-                            {"id": "share_with_friends", "title": "Share it with"},
-                            {"id": "buy_multiple", "title": "Buy multiple,"},
-                            {"id": "none", "title": "None of the above"}
-                        ]
-                    }
-                ]
-            }
-        }
-    }
 
-    response = requests.post(url, headers=headers, json=payload)
-    print(response.status_code)
-    print(response.json())
-    return response
-'''
+
+# def send_initial_message(recipient):
+#     buttons = [
+#         {
+#             "type": "reply",
+#             "reply": {
+#                 "id": "animal_meats_button",
+#                 "title": "Animal Meats"
+#             }
+#         },
+#         {
+#             "type": "reply",
+#             "reply": {
+#                 "id": "added_sugars_button",
+#                 "title": "Added Sugars"
+#             }
+#         },
+#         {
+#             "type": "reply",
+#             "reply": {
+#                 "id": "none_button",
+#                 "title": "None"
+#             }
+#         }
+#     ]
+#     send_interactive_message_with_buttons(recipient, buttons)
+
 def send_initial_message(recipient):
-    url = f"https://graph.facebook.com/{current_app.config['VERSION']}/{current_app.config['PHONE_NUMBER_ID']}/messages"
-    headers = {
-        "Authorization": "Bearer " + current_app.config['ACCESS_TOKEN'],
-        "Content-Type": "application/json",
-    }
-    payload = {
-        "messaging_product": "whatsapp",
-        "to": recipient,
-        "type": "interactive",
-        "interactive": {
-            "type": "list",
-            "header": {
-                "type": "text",
-                "text": "Choose options one by one. Type 'done' when finished."
+    buttons = get_next_buttons(recipient, first_question_options)
+    text = "We will ask you some questions on your dietary goals. Which of these would you like to get less of?"
+    send_interactive_message_with_buttons(recipient, buttons, text)
+
+
+def send_followup_message(recipient, question_type):
+    options = first_question_options if question_type == "first" else second_question_options
+    buttons = get_next_buttons(recipient, options)
+    text = "Great! Thanks. Please continue to choose your dietary goals from this list. Or select None to move on."
+    send_interactive_message_with_buttons(recipient, buttons, text)
+
+
+def send_second_question_message(recipient):
+    buttons = get_next_buttons(recipient, second_question_options)
+    text = "Great! Next, tell us which of these you would like to get more of:"
+    send_interactive_message_with_buttons(recipient, buttons, text)
+
+
+def get_next_buttons(wa_id, options):
+    user_data = user_interactions[wa_id]
+    options_left = [
+        opt for opt in options if opt not in user_data["replaced_buttons"]]
+    if len(options_left) > 2:
+        return [
+            {
+                "type": "reply",
+                "reply": {
+                    "id": f"{options_left[0].lower().replace(' ', '_')}_button",
+                    "title": options_left[0]
+                }
             },
-            "body": {
-                "text": "You've found the perfect deal, what do you do next?"
+            {
+                "type": "reply",
+                "reply": {
+                    "id": f"{options_left[1].lower().replace(' ', '_')}_button",
+                    "title": options_left[1]
+                }
             },
-            "footer": {
-                "text": "Select options"
+            {
+                "type": "reply",
+                "reply": {
+                    "id": "none_button",
+                    "title": "None"
+                }
+            }
+        ]
+    elif len(options_left) == 1:
+        return [
+            {
+                "type": "reply",
+                "reply": {
+                    "id": f"{options_left[0].lower().replace(' ', '_')}_button",
+                    "title": options_left[0]
+                }
             },
-            "action": {
-                "button": "Options",
-                "sections": [
-                    {
-                        "title": "Options",
-                        "rows": [
-                            {"id": "buy_it", "title": "Buy it now"},
-                            {"id": "check_reviews", "title": "Check reviews"},
-                            {"id": "share_with_friends", "title": "Share with friends"},
-                            {"id": "buy_multiple", "title": "Buy more"},
-                            {"id": "none", "title": "None of the above"}
-                        ]
-                    }
-                ]
+            {
+                "type": "reply",
+                "reply": {
+                    "id": "none_button",
+                    "title": "None"
+                }
+            }
+        ]
+    return [
+        {
+            "type": "reply",
+            "reply": {
+                "id": f"{options_left[0].lower().replace(' ', '_')}_button",
+                "title": options_left[0]
+            }
+        },
+        {
+            "type": "reply",
+            "reply": {
+                "id": f"{options_left[1].lower().replace(' ', '_')}_button",
+                "title": options_left[1]
+            }
+        },
+        {
+            "type": "reply",
+            "reply": {
+                "id": "none_button",
+                "title": "None"
             }
         }
-    }
-
-    response = requests.post(url, headers=headers, json=payload)
-    print(response.status_code)
-    print(response.json())
-    return response
+    ]
 
 
+# def process_text_for_whatsapp(text):
+#     pattern = r"\【.*?\】"
+#     text = re.sub(pattern, "", text).strip()
+#     pattern = r"\*\*(.*?)\*\*"
+#     replacement = r"*\1*"
+#     whatsapp_style_text = re.sub(pattern, replacement, text)
+#     return whatsapp_style_text
 
-def process_text_for_whatsapp(text):
-    # Remove brackets
-    pattern = r"\【.*?\】"
-    # Substitute the pattern with an empty string
-    text = re.sub(pattern, "", text).strip()
 
-    # Pattern to find double asterisks including the word(s) in between
-    pattern = r"\*\*(.*?)\*\*"
+def update_buttons(wa_id, selected_option):
+    user_data = user_interactions[wa_id]
+    if user_data["current_screen"] == "FIRST_QUESTION":
+        user_data["replaced_buttons"].append(selected_option)
+        user_data["first_question_responses"].append(selected_option)
+        if len(user_data["replaced_buttons"]) >= len(first_question_options):
+            user_data["current_screen"] = "SECOND_QUESTION"
+            user_data["replaced_buttons"] = []
+            send_second_question_message(wa_id)
+        else:
+            send_followup_message(wa_id, "first")
+    elif user_data["current_screen"] == "SECOND_QUESTION":
+        user_data["replaced_buttons"].append(selected_option)
+        user_data["second_question_responses"].append(selected_option)
+        if len(user_data["replaced_buttons"]) >= len(second_question_options):
+            user_data["current_screen"] = "ENTER_LIST_ITEMS"
+            prompt_for_list_items(wa_id)
+        else:
+            send_followup_message(wa_id, "second")
 
-    # Replacement pattern with single asterisks
-    replacement = r"*\1*"
 
-    # Substitute occurrences of the pattern with the replacement
-    whatsapp_style_text = re.sub(pattern, replacement, text)
+def complete_flow(wa_id):
+    responses = user_interactions[wa_id]
+    first_responses = ', '.join(responses["first_question_responses"])
+    second_responses = ', '.join(responses["second_question_responses"])
+    summary = f"Thank you for your responses! Here are your choices:\nLess of: {first_responses}\nMore of: {second_responses}"
+    send_whatsapp_message(wa_id, summary)
+    logging.info(
+        f"User {wa_id} responses:\nLess of: {first_responses}\nMore of: {second_responses}")
+    prompt_for_list_items(wa_id)
 
-    return whatsapp_style_text
 
-# Temporary storage for user selections
-user_selections = {}
+def send_whatsapp_message(wa_id, text):
+    data = get_text_message_input(wa_id, text)
+    send_message(data)
+
+
+def prompt_for_list_items(wa_id):
+    text = "Now, please enter the items you want to list, separated by commas."
+    send_whatsapp_message(wa_id, text)
+
+
+def process_text_message(wa_id, text):
+    items = [item.strip() for item in text.split(",")]
+    user_interactions[wa_id]["list_items"] = items
+    items_text = ', '.join(items)
+    response_text = f"Thank you! You've entered: {items_text}"
+    send_whatsapp_message(wa_id, response_text)
+    logging.info(f"User {wa_id} entered list items: {items_text}")
+
 
 def process_whatsapp_message(body):
+    logging.info("Processing incoming WhatsApp message...")
     wa_id = body["entry"][0]["changes"][0]["value"]["contacts"][0]["wa_id"]
-    print(wa_id)
-    name = body["entry"][0]["changes"][0]["value"]["contacts"][0]["profile"]["name"]
-    print(name)
+    if wa_id not in user_interactions:
+        user_interactions[wa_id] = {
+            "current_screen": "FIRST_QUESTION",
+            "responses": {},
+            "replaced_buttons": [],
+            "first_question_responses": [],
+            "second_question_responses": [],
+            "list_items": []
+        }
+        send_initial_message(wa_id)
+        return
 
     message = body["entry"][0]["changes"][0]["value"]["messages"][0]
-    print(message)
+    if "interactive" in message:
+        user_response_id = message["interactive"]["button_reply"]["id"]
+        user_response_title = message["interactive"]["button_reply"]["title"]
+        logging.info(f"User clicked button: {user_response_title}")
+        current_screen = user_interactions[wa_id]["current_screen"]
 
-    if message["type"] == "text":
-        message_body = message["text"]["body"]
-        print(message_body)
-        if message_body.lower() == "checkbox":
-            send_initial_message(wa_id)
-        elif message_body.lower() == "done":
-            # Finalize selection
-            response = f"You selected: {', '.join(user_selections.get(wa_id, []))}"
-            data = get_text_message_input(wa_id, response)
-            send_message(data)
-            user_selections.pop(wa_id, None)  # Clear selections
-        else:
-            response = generate_response(message_body)
-            data = get_text_message_input(wa_id, response)
-            send_message(data)
-    elif message["type"] == "interactive":
-        interactive_type = message["interactive"]["type"]
-        if interactive_type == "list_reply":
-            selected_id = message["interactive"]["list_reply"]["id"]
-            selected_title = message["interactive"]["list_reply"]["title"]
-            print(f"Option selected: {selected_title} (ID: {selected_id})")
-
-            # Store the selection
-            if wa_id not in user_selections:
-                user_selections[wa_id] = []
-            user_selections[wa_id].append(selected_title)
-
-            # Ask the user to select more options or finish
-            response = f"You selected: {selected_title}. Select more or type 'done' to finish."
-            data = get_text_message_input(wa_id, response)
-            send_message(data)
-        else:
-            print("Unhandled interactive type:", interactive_type)
-    else:
-        print("Unhandled message type:", message["type"])
-
-'''
-def process_whatsapp_message(body):
-    wa_id = body["entry"][0]["changes"][0]["value"]["contacts"][0]["wa_id"]
-    print(wa_id)
-    name = body["entry"][0]["changes"][0]["value"]["contacts"][0]["profile"]["name"]
-    print(name)
-
-    message = body["entry"][0]["changes"][0]["value"]["messages"][0]
-    print(message)
-
-    if message["type"] == "text":
-        message_body = message["text"]["body"]
-        print(message_body)
-        if message_body.lower() == "checkbox":
-            send_checkbox_buttons(wa_id)
-        else:
-            response = generate_response(message_body)
-            data = get_text_message_input(wa_id, response)
-            send_message(data)
-    elif message["type"] == "interactive":
-        interactive_type = message["interactive"]["type"]
-        if interactive_type == "list_reply":
-            selected_id = message["interactive"]["list_reply"]["id"]
-            selected_title = message["interactive"]["list_reply"]["title"]
-            print(f"Option selected: {selected_title} (ID: {selected_id})")
-
-            response = f"You selected: {selected_title}"
-            data = get_text_message_input(wa_id, response)
-            send_message(data)
-        elif interactive_type == "button_reply":
-            button_id = message["interactive"]["button_reply"]["id"]
-            button_title = message["interactive"]["button_reply"]["title"]
-            print(f"Button clicked: {button_title} (ID: {button_id})")
-
-            if button_id == "yes_button":
-                response = "You clicked Yes!"
-            elif button_id == "idk_button":
-                response = "You clicked IDK!"
-            elif button_id == "no_button":
-                response = "You clicked No!"
+        if current_screen in ["FIRST_QUESTION", "SECOND_QUESTION"]:
+            if user_response_title in first_question_options + second_question_options:
+                update_buttons(wa_id, user_response_title)
+            elif user_response_title == "None":
+                if current_screen == "FIRST_QUESTION":
+                    user_interactions[wa_id]["current_screen"] = "SECOND_QUESTION"
+                    user_interactions[wa_id]["replaced_buttons"] = []
+                    send_second_question_message(wa_id)
+                else:
+                    complete_flow(wa_id)
             else:
-                response = f"You clicked {button_title}"
-
-            data = get_text_message_input(wa_id, response)
-            send_message(data)
-        else:
-            print("Unhandled interactive type:", interactive_type)
-    else:
-        print("Unhandled message type:", message["type"])
-'''
-
-''' worked for send interactive part
-def process_whatsapp_message(body):
-    wa_id = body["entry"][0]["changes"][0]["value"]["contacts"][0]["wa_id"]
-    print(wa_id)
-    name = body["entry"][0]["changes"][0]["value"]["contacts"][0]["profile"]["name"]
-    print(name)
-    
-    message = body["entry"][0]["changes"][0]["value"]["messages"][0]
-    print(message)
-
-    if message["type"] == "text":
-        message_body = message["text"]["body"]
-        print(message_body)
-        if message_body.lower() == "button":
-            send_interactive_message_with_buttons(wa_id)
-        else:
-            response = generate_response(message_body)
-            data = get_text_message_input(wa_id, response)
-            send_message(data)
-    elif message["type"] == "interactive":
-        interactive_type = message["interactive"]["type"]
-        if interactive_type == "button_reply":
-            button_id = message["interactive"]["button_reply"]["id"]
-            button_title = message["interactive"]["button_reply"]["title"]
-            print(f"Button clicked: {button_title} (ID: {button_id})")
-
-            if button_id == "yes_button":
-                response = "You clicked Yes!"
-            elif button_id == "idk_button":
-                response = "You clicked IDK!"
-            elif button_id == "no_button":
-                response = "You clicked No!"
-            else:
-                response = f"You clicked {button_title}"
-
-            data = get_text_message_input(wa_id, response)
-            send_message(data)
-        else:
-            print("Unhandled interactive type:", interactive_type)
-    else:
-        print("Unhandled message type:", message["type"])
-'''
-
-''' code that worked but created errors when yes or no button was selected
-
-    message_body = message["text"]["body"]
-    print(message_body)
-    
-    # Updated code to process send_interactive_message
-    if message_body.lower() == "hi":
-        response = send_interactive_message_with_buttons(wa_id)
-    else:
-        response = generate_response(message_body)
-        data = get_text_message_input(wa_id, response)
-        send_message(data)
-
-    print(response.status_code)
-    print(response.json())
-    '''
-    # TODO: implement custom function here
-    # response = generate_response(message_body)
-    # response = 'HI THERE'
-    
-    # OpenAI Integration
-    # response = generate_response(message_body, wa_id, name)
-    # response = process_text_for_whatsapp(response)
-
-    # data = get_text_message_input(current_app.config["RECIPIENT_WAID"], response)
-    # send_message(data)
+                send_initial_message(wa_id)
+    elif "text" in message:
+        user_text = message["text"]["body"]
+        logging.info(f"User {wa_id} sent text message: {user_text}")
+        if user_interactions[wa_id]["current_screen"] == "ENTER_LIST_ITEMS":
+            process_text_message(wa_id, user_text)
 
 
 def is_valid_whatsapp_message(body):
-    """
-    Check if the incoming webhook event has a valid WhatsApp message structure.
-    """
     return (
         body.get("object")
         and body.get("entry")
@@ -414,15 +312,22 @@ def is_valid_whatsapp_message(body):
         and body["entry"][0]["changes"][0]["value"]["messages"][0]
     )
 
-# Attempt to implement starting message
-'''
-@current_app.route('/webhook', methods=['POST'])
-def webhook():
-    if request.method == 'POST':
-        body = request.json
-        if is_valid_whatsapp_message(body):
-            process_whatsapp_message(body)
-        return "EVENT_RECEIVED", 200
-    else:
-        return "NOT_FOUND", 404
-'''
+# Example function stubs for handling other questions
+
+
+# def handle_question_one(wa_id):
+#     text = "Question 1: Choose from the options: Option 1, Option 2, Option 3"
+#     data = get_text_message_input(wa_id, text)
+#     send_message(data)
+
+
+# def handle_question_two(wa_id):
+#     text = "Question 2: Choose from the options: Option A, Option B, Option C"
+#     data = get_text_message_input(wa_id, text)
+#     send_message(data)
+
+
+# def handle_question_three(wa_id):
+#     text = "Question 3: Choose from the options: Choice X, Choice Y, Choice Z"
+#     data = get_text_message_input(wa_id, text)
+#     send_message(data)
