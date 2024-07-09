@@ -8,11 +8,9 @@ import re
 user_interactions = {}
 
 # Dietary options for the first question
-first_question_options = ["Animal Meats",
-                          "Added Sugars", "Sodium/Salt", "Saturated Fat"]
+first_question_options = ["Animal Meats", "Added Sugars", "Sodium/Salt", "Saturated Fat"]
 # Dietary options for the second question
-second_question_options = ["Whole Grains",
-                           "Plant Proteins", "Vegetables", "Fruit", "Fish"]
+second_question_options = ["Whole Grains", "Plant Proteins", "Vegetables", "Fruit", "Fish"]
 
 
 def log_http_response(response):
@@ -212,6 +210,7 @@ def get_next_buttons(wa_id, options):
 
 def update_buttons(wa_id, selected_option):
     user_data = user_interactions[wa_id]
+    logging.info(f"Updating buttons for user {wa_id}, selected option: {selected_option}")
     if user_data["current_screen"] == "FIRST_QUESTION":
         user_data["replaced_buttons"].append(selected_option)
         user_data["first_question_responses"].append(selected_option)
@@ -229,6 +228,7 @@ def update_buttons(wa_id, selected_option):
             prompt_for_list_items(wa_id)
         else:
             send_followup_message(wa_id, "second")
+    logging.info(f"User {wa_id} current screen after update: {user_data['current_screen']}")
 
 
 def complete_flow(wa_id):
@@ -237,8 +237,8 @@ def complete_flow(wa_id):
     second_responses = ', '.join(responses["second_question_responses"])
     summary = f"Thank you for your responses! Here are your choices:\nLess of: {first_responses}\nMore of: {second_responses}"
     send_whatsapp_message(wa_id, summary)
-    logging.info(
-        f"User {wa_id} responses:\nLess of: {first_responses}\nMore of: {second_responses}")
+    logging.info(f"User {wa_id} responses:\nLess of: {first_responses}\nMore of: {second_responses}")
+    user_interactions[wa_id]["current_screen"] = "ENTER_LIST_ITEMS"
     prompt_for_list_items(wa_id)
 
 
@@ -253,6 +253,7 @@ def prompt_for_list_items(wa_id):
 
 
 def process_text_message(wa_id, text):
+    logging.info(f"Processing text message for {wa_id}")
     items = [item.strip() for item in text.split(",")]
     user_interactions[wa_id]["list_items"] = items
     items_text = ', '.join(items)
@@ -260,11 +261,12 @@ def process_text_message(wa_id, text):
     send_whatsapp_message(wa_id, response_text)
     logging.info(f"User {wa_id} entered list items: {items_text}")
 
-
 def process_whatsapp_message(body):
     logging.info("Processing incoming WhatsApp message...")
     wa_id = body["entry"][0]["changes"][0]["value"]["contacts"][0]["wa_id"]
+    logging.info(f"WA ID: {wa_id}")
     if wa_id not in user_interactions:
+        logging.info(f"New user: {wa_id}")
         user_interactions[wa_id] = {
             "current_screen": "FIRST_QUESTION",
             "responses": {},
@@ -277,11 +279,14 @@ def process_whatsapp_message(body):
         return
 
     message = body["entry"][0]["changes"][0]["value"]["messages"][0]
+    logging.info(f"Received message: {message}")
+
     if "interactive" in message:
         user_response_id = message["interactive"]["button_reply"]["id"]
         user_response_title = message["interactive"]["button_reply"]["title"]
         logging.info(f"User clicked button: {user_response_title}")
         current_screen = user_interactions[wa_id]["current_screen"]
+        logging.info(f"Current screen: {current_screen}")
 
         if current_screen in ["FIRST_QUESTION", "SECOND_QUESTION"]:
             if user_response_title in first_question_options + second_question_options:
@@ -298,8 +303,12 @@ def process_whatsapp_message(body):
     elif "text" in message:
         user_text = message["text"]["body"]
         logging.info(f"User {wa_id} sent text message: {user_text}")
-        if user_interactions[wa_id]["current_screen"] == "ENTER_LIST_ITEMS":
+        current_screen = user_interactions[wa_id]["current_screen"]
+        logging.info(f"Current screen: {current_screen}")
+        if current_screen == "ENTER_LIST_ITEMS":
             process_text_message(wa_id, user_text)
+        else:
+            logging.warning(f"Unexpected text message at screen: {current_screen}")
 
 
 def is_valid_whatsapp_message(body):
