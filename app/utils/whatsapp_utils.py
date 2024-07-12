@@ -3,6 +3,8 @@ from flask import current_app, jsonify, request
 import json
 import requests
 import re
+#from PIL import Image, ImageDraw, ImageFont
+#import io
 
 # Temporary storage for user interactions
 user_interactions = {}
@@ -11,6 +13,28 @@ user_interactions = {}
 first_question_options = ["Animal Meats", "Added Sugars", "Sodium/Salt", "Saturated Fat"]
 # Dietary options for the second question
 second_question_options = ["Whole Grains", "Plant Proteins", "Vegetables", "Fruit", "Fish"]
+
+# Product information
+products = [
+    {
+        "name": "Tyson Tender & Juicy Extra Meaty Fresh Pork Baby Back Ribs, 2.9 - 4.0 lb",
+        "image_url": "https://i5.walmartimages.com/seo/Tyson-Tender-Juicy-Extra-Meaty-Fresh-Pork-Baby-Back-Ribs-2-9-4-0-lb_cd1758bf-38b2-4f69-a807-2447bef2baad.ae0ee379ed97fdc1c60a0f2dd7dc6a66.jpeg?odnHeight=180&odnWidth=180&odnBg=FFFFFF",
+        "price": 12.72,
+        "actual_url": "https://www.walmart.com/ip/723867836"
+    },
+    {
+        "name": "Boneless, Skinless Chicken Breasts, 4.7-6.1 lb Tray",
+        "image_url": "https://i5.walmartimages.com/seo/Boneless-Skinless-Chicken-Breasts-4-7-6-1-lb-Tray_4693e429-b926-4913-984c-dd29d4bdd586.780145c264e407b17e86cd4a7106731f.jpeg?odnHeight=180&odnWidth=180&odnBg=FFFFFF",
+        "price": 12.18,
+        "actual_url": "https://www.walmart.com/ip/27935840"
+    },
+    {
+        "name": "King Arthur Baking Company Unbleached Bread Flour, Non-GMO Project Verified, Certified Kosher, 5lb",
+        "image_url": "https://i5.walmartimages.com/seo/King-Arthur-Baking-Company-Unbleached-Bread-Flour-Non-GMO-Project-Verified-Certified-Kosher-5lb_66a80131-e677-4380-a968-fdcf4e154da2.1a2fc9a01e709b238190cf75dc465516.png?odnHeight=180&odnWidth=180&odnBg=FFFFFF",
+        "price": 5.58,
+        "actual_url": "https://www.walmart.com/ip/10535108"
+    }
+]
 
 
 def log_http_response(response):
@@ -27,6 +51,17 @@ def get_text_message_input(recipient, text):
             "to": recipient,
             "type": "text",
             "text": {"preview_url": False, "body": text},
+        }
+    )
+    
+def get_image_message_input(recipient, image_url, caption):
+    return json.dumps(
+        {
+            "messaging_product": "whatsapp",
+            "recipient_type": "individual",
+            "to": recipient,
+            "type": "image",
+            "image": {"link": image_url, "caption": caption},
         }
     )
 
@@ -245,7 +280,13 @@ def complete_flow(wa_id):
 def send_whatsapp_message(wa_id, text):
     data = get_text_message_input(wa_id, text)
     send_message(data)
+    
 
+def send_product_messages(wa_id):
+    for product in products:
+        caption = f"{product['name']}\nPrice: ${product['price']}"
+        data = get_image_message_input(wa_id, product["image_url"], caption)
+        send_message(data)
 
 def prompt_for_list_items(wa_id):
     text = "Now, please enter the items you want to list, separated by commas."
@@ -260,6 +301,8 @@ def process_text_message(wa_id, text):
     response_text = f"Thank you! You've entered: {items_text}"
     send_whatsapp_message(wa_id, response_text)
     logging.info(f"User {wa_id} entered list items: {items_text}")
+    send_product_messages(wa_id)  # Call the function to send product images
+
 
 def process_whatsapp_message(body):
     logging.info("Processing incoming WhatsApp message...")
@@ -320,23 +363,3 @@ def is_valid_whatsapp_message(body):
         and body["entry"][0]["changes"][0]["value"].get("messages")
         and body["entry"][0]["changes"][0]["value"]["messages"][0]
     )
-
-# Example function stubs for handling other questions
-
-
-# def handle_question_one(wa_id):
-#     text = "Question 1: Choose from the options: Option 1, Option 2, Option 3"
-#     data = get_text_message_input(wa_id, text)
-#     send_message(data)
-
-
-# def handle_question_two(wa_id):
-#     text = "Question 2: Choose from the options: Option A, Option B, Option C"
-#     data = get_text_message_input(wa_id, text)
-#     send_message(data)
-
-
-# def handle_question_three(wa_id):
-#     text = "Question 3: Choose from the options: Choice X, Choice Y, Choice Z"
-#     data = get_text_message_input(wa_id, text)
-#     send_message(data)
