@@ -20,19 +20,19 @@ products = [
         "name": "Tyson Tender & Juicy Extra Meaty Fresh Pork Baby Back Ribs, 2.9 - 4.0 lb",
         "image_url": "https://i5.walmartimages.com/seo/Tyson-Tender-Juicy-Extra-Meaty-Fresh-Pork-Baby-Back-Ribs-2-9-4-0-lb_cd1758bf-38b2-4f69-a807-2447bef2baad.ae0ee379ed97fdc1c60a0f2dd7dc6a66.jpeg?odnHeight=180&odnWidth=180&odnBg=FFFFFF",
         "price": 12.72,
-        "actual_url": "https://www.walmart.com/ip/723867836"
+        "url": "https://www.walmart.com/ip/Prairie-Fresh-Natural-Fresh-Pork-Back-Ribs-Bone-in-2-4-3-8-lb-19g-of-Protein-per-4-oz-Serving/465183919?athcpid=465183919&athpgid=AthenaItempage&athcgid=null&athznid=si&athieid=v0_eeMTQ3LjA3LDEzMTMuMDYwMDAwMDAwMDAwMiwwLjExNjA3MzE1NTY2NjQxMDM1LDAuNV8&athstid=CS055~CS004&athguid=2QHQlDSDXQuFQzBSG-Pk7x-cawXcZvN2_rWC&athancid=723867836&athposb=0&athena=true"
     },
     {
         "name": "Boneless, Skinless Chicken Breasts, 4.7-6.1 lb Tray",
         "image_url": "https://i5.walmartimages.com/seo/Boneless-Skinless-Chicken-Breasts-4-7-6-1-lb-Tray_4693e429-b926-4913-984c-dd29d4bdd586.780145c264e407b17e86cd4a7106731f.jpeg?odnHeight=180&odnWidth=180&odnBg=FFFFFF",
         "price": 12.18,
-        "actual_url": "https://www.walmart.com/ip/27935840"
+        "url": "https://www.walmart.com/ip/Boneless-Skinless-Chicken-Breasts-4-7-6-1-lb-Tray/27935840"
     },
     {
         "name": "King Arthur Baking Company Unbleached Bread Flour, Non-GMO Project Verified, Certified Kosher, 5lb",
         "image_url": "https://i5.walmartimages.com/seo/King-Arthur-Baking-Company-Unbleached-Bread-Flour-Non-GMO-Project-Verified-Certified-Kosher-5lb_66a80131-e677-4380-a968-fdcf4e154da2.1a2fc9a01e709b238190cf75dc465516.png?odnHeight=180&odnWidth=180&odnBg=FFFFFF",
         "price": 5.58,
-        "actual_url": "https://www.walmart.com/ip/10535108"
+        "url": "https://www.walmart.com/ip/King-Arthur-Unbleached-Bread-Flour-Non-GMO-Project-Verified-Certified-Kosher-No-Preservatives-5-Pounds/10535108"
     }
 ]
 
@@ -53,7 +53,7 @@ def get_text_message_input(recipient, text):
             "text": {"preview_url": False, "body": text},
         }
     )
-    
+
 def get_image_message_input(recipient, image_url, caption):
     return json.dumps(
         {
@@ -62,6 +62,17 @@ def get_image_message_input(recipient, image_url, caption):
             "to": recipient,
             "type": "image",
             "image": {"link": image_url, "caption": caption},
+        }
+    )
+    
+def get_product_url_message_input(recipient, image_url, caption):
+    return json.dumps(
+        {
+            "messaging_product": "whatsapp",
+            "recipient_type": "individual",
+            "to": recipient,
+            "type": "button",
+            "button": {"link": url, "caption": caption},
         }
     )
 
@@ -118,32 +129,40 @@ def send_interactive_message_with_buttons(recipient, buttons, text):
         logging.error(f"Failed to send interactive message: {e}")
     return response
 
-
-# def send_initial_message(recipient):
-#     buttons = [
-#         {
-#             "type": "reply",
-#             "reply": {
-#                 "id": "animal_meats_button",
-#                 "title": "Animal Meats"
-#             }
-#         },
-#         {
-#             "type": "reply",
-#             "reply": {
-#                 "id": "added_sugars_button",
-#                 "title": "Added Sugars"
-#             }
-#         },
-#         {
-#             "type": "reply",
-#             "reply": {
-#                 "id": "none_button",
-#                 "title": "None"
-#             }
-#         }
-#     ]
-#     send_interactive_message_with_buttons(recipient, buttons)
+def send_interactive_message_with_app_button(recipient, text, button_text, app_link):
+    url = f"https://graph.facebook.com/{current_app.config['VERSION']}/{current_app.config['PHONE_NUMBER_ID']}/messages"
+    headers = {
+        "Authorization": "Bearer " + current_app.config['ACCESS_TOKEN'],
+        "Content-Type": "application/json",
+    }
+    payload = {
+        "messaging_product": "whatsapp",
+        "to": recipient,
+        "type": "interactive",
+        "interactive": {
+            "type": "button",
+            "body": {
+                "text": text
+            },
+            "action": {
+                "buttons": [
+                    {
+                        "type": "url",
+                        "url": app_link,
+                        "text": button_text
+                    }
+                ]
+            }
+        }
+    }
+    try:
+        response = requests.post(url, headers=headers, json=payload)
+        response.raise_for_status()
+        logging.info(f"Interactive message with app button sent to {recipient}")
+        logging.info(response.json())
+    except requests.RequestException as e:
+        logging.error(f"Failed to send interactive message with app button: {e}")
+    return response
 
 def send_initial_message(recipient):
     buttons = get_next_buttons(recipient, first_question_options)
@@ -234,15 +253,6 @@ def get_next_buttons(wa_id, options):
     ]
 
 
-# def process_text_for_whatsapp(text):
-#     pattern = r"\【.*?\】"
-#     text = re.sub(pattern, "", text).strip()
-#     pattern = r"\*\*(.*?)\*\*"
-#     replacement = r"*\1*"
-#     whatsapp_style_text = re.sub(pattern, replacement, text)
-#     return whatsapp_style_text
-
-
 def update_buttons(wa_id, selected_option):
     user_data = user_interactions[wa_id]
     logging.info(f"Updating buttons for user {wa_id}, selected option: {selected_option}")
@@ -280,12 +290,52 @@ def complete_flow(wa_id):
 def send_whatsapp_message(wa_id, text):
     data = get_text_message_input(wa_id, text)
     send_message(data)
-    
+
+def send_interactive_message_with_url_button(recipient, text, button_text, url):
+    url = f"https://graph.facebook.com/{current_app.config['VERSION']}/{current_app.config['PHONE_NUMBER_ID']}/messages"
+    headers = {
+        "Authorization": "Bearer " + current_app.config['ACCESS_TOKEN'],
+        "Content-Type": "application/json",
+    }
+    payload = {
+        "messaging_product": "whatsapp",
+        "to": recipient,
+        "type": "interactive",
+        "interactive": {
+            "type": "button",
+            "body": {
+                "text": text
+            },
+            "action": {
+                "buttons": [
+                    {
+                        "type": "url",
+                        "url": url,
+                        "text": button_text
+                    }
+                ]
+            }
+        }
+    }
+    try:
+        response = requests.post(url, headers=headers, json=payload)
+        response.raise_for_status()
+        logging.info(f"Interactive message with URL button sent to {recipient}")
+        logging.info(response.json())
+    except requests.RequestException as e:
+        logging.error(f"Failed to send interactive message with URL button: {e}")
+    return response
 
 def send_product_messages(wa_id):
     for product in products:
+        # Send the product image
         caption = f"{product['name']}\nPrice: ${product['price']}"
         data = get_image_message_input(wa_id, product["image_url"], caption)
+        send_message(data)
+        
+        # Send the Walmart URL as a text message
+        url_message = f"View this product on Walmart: {product['url']}"
+        data = get_text_message_input(wa_id, url_message)
         send_message(data)
 
 def prompt_for_list_items(wa_id):
