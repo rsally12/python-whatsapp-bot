@@ -64,18 +64,6 @@ def get_image_message_input(recipient, image_url, caption):
             "image": {"link": image_url, "caption": caption},
         }
     )
-    
-def get_product_url_message_input(recipient, image_url, caption):
-    return json.dumps(
-        {
-            "messaging_product": "whatsapp",
-            "recipient_type": "individual",
-            "to": recipient,
-            "type": "button",
-            "button": {"link": url, "caption": caption},
-        }
-    )
-
 
 def send_message(data):
     headers = {
@@ -127,41 +115,6 @@ def send_interactive_message_with_buttons(recipient, buttons, text):
         logging.info(response.json())
     except requests.RequestException as e:
         logging.error(f"Failed to send interactive message: {e}")
-    return response
-
-def send_interactive_message_with_app_button(recipient, text, button_text, app_link):
-    url = f"https://graph.facebook.com/{current_app.config['VERSION']}/{current_app.config['PHONE_NUMBER_ID']}/messages"
-    headers = {
-        "Authorization": "Bearer " + current_app.config['ACCESS_TOKEN'],
-        "Content-Type": "application/json",
-    }
-    payload = {
-        "messaging_product": "whatsapp",
-        "to": recipient,
-        "type": "interactive",
-        "interactive": {
-            "type": "button",
-            "body": {
-                "text": text
-            },
-            "action": {
-                "buttons": [
-                    {
-                        "type": "url",
-                        "url": app_link,
-                        "text": button_text
-                    }
-                ]
-            }
-        }
-    }
-    try:
-        response = requests.post(url, headers=headers, json=payload)
-        response.raise_for_status()
-        logging.info(f"Interactive message with app button sent to {recipient}")
-        logging.info(response.json())
-    except requests.RequestException as e:
-        logging.error(f"Failed to send interactive message with app button: {e}")
     return response
 
 def send_initial_message(recipient):
@@ -290,41 +243,6 @@ def complete_flow(wa_id):
 def send_whatsapp_message(wa_id, text):
     data = get_text_message_input(wa_id, text)
     send_message(data)
-
-def send_interactive_message_with_url_button(recipient, text, button_text, url):
-    url = f"https://graph.facebook.com/{current_app.config['VERSION']}/{current_app.config['PHONE_NUMBER_ID']}/messages"
-    headers = {
-        "Authorization": "Bearer " + current_app.config['ACCESS_TOKEN'],
-        "Content-Type": "application/json",
-    }
-    payload = {
-        "messaging_product": "whatsapp",
-        "to": recipient,
-        "type": "interactive",
-        "interactive": {
-            "type": "button",
-            "body": {
-                "text": text
-            },
-            "action": {
-                "buttons": [
-                    {
-                        "type": "url",
-                        "url": url,
-                        "text": button_text
-                    }
-                ]
-            }
-        }
-    }
-    try:
-        response = requests.post(url, headers=headers, json=payload)
-        response.raise_for_status()
-        logging.info(f"Interactive message with URL button sent to {recipient}")
-        logging.info(response.json())
-    except requests.RequestException as e:
-        logging.error(f"Failed to send interactive message with URL button: {e}")
-    return response
 
 def send_product_messages(wa_id):
     for product in products:
