@@ -3,8 +3,6 @@ from flask import current_app, jsonify, request
 import json
 import requests
 import re
-#from PIL import Image, ImageDraw, ImageFont
-#import io
 
 # Temporary storage for user interactions
 user_interactions = {}
@@ -18,23 +16,62 @@ second_question_options = ["Whole Grains", "Plant Proteins", "Vegetables", "Frui
 products = [
     {
         "name": "Tyson Tender & Juicy Extra Meaty Fresh Pork Baby Back Ribs, 2.9 - 4.0 lb",
-        "image_url": "https://i5.walmartimages.com/seo/Tyson-Tender-Juicy-Extra-Meaty-Fresh-Pork-Baby-Back-Ribs-2-9-4-0-lb_cd1758bf-38b2-4f69-a807-2447bef2baad.ae0ee379ed97fdc1c60a0f2dd7dc6a66.jpeg?odnHeight=180&odnWidth=180&odnBg=FFFFFF",
+        "image_url": "https://i5.walmartimages.com/seo/Tyson-Tender-Juicy-Extra-Meaty-Fresh-Pork-Baby-Back-Ribs-2-9-4-0-lb_cd1758bf-38b2-4f69-a807-2447bef2baad.ae0ee379ed97fdc1c60a0f2dd7dc6a66.jpeg?odnHeight=20&odnWidth=20&odnBg=FFFFFF",
         "price": 12.72,
         "url": "https://www.walmart.com/ip/Prairie-Fresh-Natural-Fresh-Pork-Back-Ribs-Bone-in-2-4-3-8-lb-19g-of-Protein-per-4-oz-Serving/465183919?athcpid=465183919&athpgid=AthenaItempage&athcgid=null&athznid=si&athieid=v0_eeMTQ3LjA3LDEzMTMuMDYwMDAwMDAwMDAwMiwwLjExNjA3MzE1NTY2NjQxMDM1LDAuNV8&athstid=CS055~CS004&athguid=2QHQlDSDXQuFQzBSG-Pk7x-cawXcZvN2_rWC&athancid=723867836&athposb=0&athena=true"
     },
     {
         "name": "Boneless, Skinless Chicken Breasts, 4.7-6.1 lb Tray",
-        "image_url": "https://i5.walmartimages.com/seo/Boneless-Skinless-Chicken-Breasts-4-7-6-1-lb-Tray_4693e429-b926-4913-984c-dd29d4bdd586.780145c264e407b17e86cd4a7106731f.jpeg?odnHeight=180&odnWidth=180&odnBg=FFFFFF",
+        "image_url": "https://i5.walmartimages.com/seo/Boneless-Skinless-Chicken-Breasts-4-7-6-1-lb-Tray_4693e429-b926-4913-984c-dd29d4bdd586.780145c264e407b17e86cd4a7106731f.jpeg?odnHeight=20&odnWidth=20&odnBg=FFFFFF",
         "price": 12.18,
         "url": "https://www.walmart.com/ip/Boneless-Skinless-Chicken-Breasts-4-7-6-1-lb-Tray/27935840"
     },
     {
         "name": "King Arthur Baking Company Unbleached Bread Flour, Non-GMO Project Verified, Certified Kosher, 5lb",
-        "image_url": "https://i5.walmartimages.com/seo/King-Arthur-Baking-Company-Unbleached-Bread-Flour-Non-GMO-Project-Verified-Certified-Kosher-5lb_66a80131-e677-4380-a968-fdcf4e154da2.1a2fc9a01e709b238190cf75dc465516.png?odnHeight=180&odnWidth=180&odnBg=FFFFFF",
+        "image_url": "https://i5.walmartimages.com/seo/King-Arthur-Baking-Company-Unbleached-Bread-Flour-Non-GMO-Project-Verified-Certified-Kosher-5lb_66a80131-e677-4380-a968-fdcf4e154da2.1a2fc9a01e709b238190cf75dc465516.png?odnHeight=20&odnWidth=20&odnBg=FFFFFF",
         "price": 5.58,
         "url": "https://www.walmart.com/ip/King-Arthur-Unbleached-Bread-Flour-Non-GMO-Project-Verified-Certified-Kosher-No-Preservatives-5-Pounds/10535108"
     }
 ]
+
+# Additional product alternatives
+product_alternatives = [
+    {
+        "name": "Nature's Own 100% Whole Grain Sliced Sandwich Bread, 20 oz Loaf",
+        "image_url": "https://i5.walmartimages.com/seo/Nature-s-Own-100-Whole-Grain-Sliced-Sandwich-Bread-20-oz-Loaf_1a898206-c518-4487-b181-edfa45a392b5.579accfdd5d1174ffb6cd42599768d82.jpeg?odnHeight=2000&odnWidth=2000&odnBg=FFFFFF",
+        "price": 3.42,
+        "url": "https://www.walmart.com/ip/Nature-s-Own-100-Whole-Grain-Sliced-Sandwich-Bread-20-oz-Loaf/20659508?athbdg=L1200&from=/search"
+    },
+    {
+        "name": "Mission Super Soft Whole Wheat Soft Taco Flour Tortillas, 16 oz, 10 Count",
+        "image_url": "https://i5.walmartimages.com/seo/Mission-Super-Soft-Whole-Wheat-Soft-Taco-Flour-Tortillas-16-oz-10-Count_5f722c5b-619a-4438-9c76-4b00a88ff14c.8bbf1e620288bdedd02f29b151f413d8.jpeg?odnHeight=2000&odnWidth=2000&odnBg=FFFFFF",
+        "price": 3.18,
+        "url": "https://www.walmart.com/ip/Mission-Super-Soft-Whole-Wheat-Soft-Taco-Flour-Tortillas-16-oz-10-Count/15021157?from=/search", 
+    },
+    {
+        "name": "Great Value Organic Tri-Color Quinoa, 16 oz",
+        "image_url": "https://i5.walmartimages.com/seo/Great-Value-Organic-Tri-Color-Quinoa-16-oz_44a8f05d-a8b8-4821-9e43-7bd88c4a3b9d.01ea42f7df850ce6ce0c65399d98d306.jpeg?odnHeight=2000&odnWidth=2000&odnBg=FFFFFF",
+        "price": 5.58,
+        "url": "https://www.walmart.com/ip/Great-Value-Organic-Tri-Color-Quinoa-16-oz/51258776?athbdg=L1200&from=/search"
+    }
+]
+
+def send_alternative_products_message(wa_id, alternatives):
+    text = "Ok, here are three different types of Bread and Grain Alternatives:"
+    send_whatsapp_message(wa_id, text)
+    for product in alternatives:
+        caption = f"{product['name']}\nPrice: ${product['price']}"
+        data = get_image_message_input(wa_id, product["image_url"], caption)
+        send_message(data)
+        
+        # Send the Walmart URL as a text message
+        url_message = f"View this product on Walmart: {product['url']}"
+        data = get_text_message_input(wa_id, url_message)
+        send_message(data)
+
+
+# Logo URL
+logo_url = "https://github.com/rsally12/python-whatsapp-bot/blob/test1/app/utils/FINs_Logo.png"  # Replace with your actual logo URL
 
 
 def log_http_response(response):
@@ -54,6 +91,7 @@ def get_text_message_input(recipient, text):
         }
     )
 
+# Function to send image message
 def get_image_message_input(recipient, image_url, caption):
     return json.dumps(
         {
@@ -101,7 +139,7 @@ def send_interactive_message_with_buttons(recipient, buttons, text):
         "interactive": {
             "type": "button",
             "body": {
-                "text": text
+                "text": f"*{text}*"  # Bold the text
             },
             "action": {
                 "buttons": buttons
@@ -121,6 +159,18 @@ def send_initial_message(recipient):
     buttons = get_next_buttons(recipient, first_question_options)
     text = "We will ask you some questions on your dietary goals. Which of these would you like to get less of?"
     send_interactive_message_with_buttons(recipient, buttons, text)
+
+
+def send_welcome_message(wa_id):
+    # Send welcome text message
+    welcome_text = "Welcome to the Food Information Networks Chat! We will first ask you some questions regarding your dietary goals."
+    data = get_text_message_input(wa_id, welcome_text)
+    send_message(data)
+    
+    # Send logo image message
+    logo_caption = "Food Information Networks"
+    data = get_image_message_input(wa_id, logo_url, logo_caption)
+    send_message(data)
 
 
 def send_followup_message(recipient, question_type):
@@ -227,6 +277,27 @@ def update_buttons(wa_id, selected_option):
         else:
             send_followup_message(wa_id, "second")
     logging.info(f"User {wa_id} current screen after update: {user_data['current_screen']}")
+    
+
+def send_feedback_question(wa_id):
+    text = "Do you want to see more product alternatives?"
+    buttons = [
+        {
+            "type": "reply",
+            "reply": {
+                "id": "feedback_yes",
+                "title": "Yes"
+            }
+        },
+        {
+            "type": "reply",
+            "reply": {
+                "id": "feedback_no",
+                "title": "No"
+            }
+        }
+    ]
+    send_interactive_message_with_buttons(wa_id, buttons, text)
 
 
 def complete_flow(wa_id):
@@ -240,6 +311,7 @@ def complete_flow(wa_id):
     prompt_for_list_items(wa_id)
 
 
+# Function to send text message
 def send_whatsapp_message(wa_id, text):
     data = get_text_message_input(wa_id, text)
     send_message(data)
@@ -255,6 +327,9 @@ def send_product_messages(wa_id):
         url_message = f"View this product on Walmart: {product['url']}"
         data = get_text_message_input(wa_id, url_message)
         send_message(data)
+    
+    # After all products have been displayed, send the feedback question
+    send_feedback_question(wa_id)
 
 def prompt_for_list_items(wa_id):
     text = "Now, please enter the items you want to list, separated by commas."
@@ -269,7 +344,11 @@ def process_text_message(wa_id, text):
     response_text = f"Thank you! You've entered: {items_text}"
     send_whatsapp_message(wa_id, response_text)
     logging.info(f"User {wa_id} entered list items: {items_text}")
+    
     send_product_messages(wa_id)  # Call the function to send product images
+    
+    user_interactions[wa_id]["current_screen"] = "FEEDBACK"  # Set the screen to FEEDBACK after sending products
+
 
 
 def process_whatsapp_message(body):
@@ -286,6 +365,7 @@ def process_whatsapp_message(body):
             "second_question_responses": [],
             "list_items": []
         }
+        send_welcome_message(wa_id)
         send_initial_message(wa_id)
         return
 
@@ -311,6 +391,26 @@ def process_whatsapp_message(body):
                     complete_flow(wa_id)
             else:
                 send_initial_message(wa_id)
+        elif current_screen == "FEEDBACK":
+            if user_response_id == "feedback_yes":
+                response_text = "Great! Which product do you want to see more product alternatives for?"
+                send_whatsapp_message(wa_id, response_text)
+                user_interactions[wa_id]["current_screen"] = "PRODUCT_SELECTION"
+            elif user_response_id == "feedback_no":
+                response_text = "Ok, we will send the questions to Walmart."
+                send_whatsapp_message(wa_id, response_text)
+                user_interactions[wa_id]["current_screen"] = "END"
+            else:
+                send_initial_message(wa_id)
+        elif current_screen == "PRODUCT_SELECTION":
+            # Assuming user enters a product name here, no specific validation for simplicity
+            selected_item = user_response_title
+            response_text = f"You selected {selected_item}. Here are some alternatives."
+            send_whatsapp_message(wa_id, response_text)
+            send_alternative_products_message(wa_id, product_alternatives)
+            user_interactions[wa_id]["current_screen"] = "END"
+        else:
+            send_initial_message(wa_id)
     elif "text" in message:
         user_text = message["text"]["body"]
         logging.info(f"User {wa_id} sent text message: {user_text}")
@@ -318,9 +418,15 @@ def process_whatsapp_message(body):
         logging.info(f"Current screen: {current_screen}")
         if current_screen == "ENTER_LIST_ITEMS":
             process_text_message(wa_id, user_text)
+        elif current_screen == "PRODUCT_SELECTION":
+            # Process product selection text message
+            selected_item = user_text
+            response_text = f"You selected {selected_item}. Here are some alternatives."
+            send_whatsapp_message(wa_id, response_text)
+            send_alternative_products_message(wa_id, product_alternatives)
+            user_interactions[wa_id]["current_screen"] = "END"
         else:
             logging.warning(f"Unexpected text message at screen: {current_screen}")
-
 
 def is_valid_whatsapp_message(body):
     return (
